@@ -75,3 +75,8 @@ xcuserdata/
 # Additional Xcode files that can contain sensitive data
 project.xcworkspace/
 xcshareddata/xcschemes/
+
+discovered.md
+
+CLAUDE.md
+todo.md
