@@ -40,7 +40,7 @@ playground.xcworkspace
 # Pods/
 #
 # Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
+*.xcworkspace
 
 # Carthage
 #
@@ -60,4 +60,18 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# macOS
 .DS_Store
+
+# Xcode schemes and workspace data (can contain secrets)
+*.xcscheme
+*.xcworkspace
+
+# Xcode project user data
+xcuserdata/
+*.xcuserstate
+
+# Additional Xcode files that can contain sensitive data
+project.xcworkspace/
+xcshareddata/xcschemes/
