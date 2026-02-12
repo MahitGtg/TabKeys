@@ -37,9 +37,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         statusItem?.menu = menu
         
-        // Initialize keyboard monitor
-        keyboardMonitor = KeyboardMonitor()
-
         // Initialize Anthropic API with environment variable
         if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] {
             anthropicAPI = AnthropicAPI(apiKey: apiKey)
@@ -47,6 +44,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             print("⚠️ ANTHROPIC_API_KEY environment variable not set")
         }
+
+        // Initialize keyboard monitor with API reference
+        keyboardMonitor = KeyboardMonitor(anthropicAPI: anthropicAPI)
 
         // Check and ensure permissions
         ensurePermissions()

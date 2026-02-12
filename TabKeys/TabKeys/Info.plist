@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>TabKeys needs accessibility access to monitor keyboard input</string>
+	<string>TabKeys needs accessibility access to monitor keyboard input and read text content from the currently focused application to provide AI-powered text completions.</string>
 </dict>
 </plist>
