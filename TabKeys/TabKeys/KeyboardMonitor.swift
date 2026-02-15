@@ -11,9 +11,12 @@ class KeyboardMonitor {
     private var pauseTimer: Timer?
     private let pauseThreshold: TimeInterval = 0.5 // 0.5 seconds of pause
     private weak var anthropicAPI: AnthropicAPI?
+    private var hoverWindow: CompletionHoverWindow?
+    private var pendingCompletion: String? = nil
 
     init(anthropicAPI: AnthropicAPI?) {
         self.anthropicAPI = anthropicAPI
+        self.hoverWindow = CompletionHoverWindow()
     }
         
     func start() {
@@ -38,11 +41,12 @@ class KeyboardMonitor {
                     let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon!).takeUnretainedValue()
                     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
-                    // Tab key (keyCode 48) - trigger completion
+                    // Tab key (keyCode 48) - only insert completion if hover has one; otherwise let Tab through
                     if keyCode == 48 {
-                        print("⌨️  TAB key pressed!")
-                        monitor.triggerCompletion()
-                        return nil // Consume the tab event so it doesn't get passed through
+                        if monitor.acceptPendingCompletion() {
+                            return nil // Consume the tab event (we inserted text)
+                        }
+                        // No completion in hover: let Tab pass through to the app
                     }
 
                     // For other keys, capture the character and add to buffer
@@ -71,6 +75,8 @@ class KeyboardMonitor {
 
         pauseTimer?.invalidate()
         pauseTimer = nil
+        
+        dismissHover()
 
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
@@ -84,6 +90,11 @@ class KeyboardMonitor {
     }
     
     private func handleKeystroke(event: CGEvent) {
+        // Dismiss hover window if user continues typing
+        if hoverWindow?.isVisible() == true {
+            dismissHover()
+        }
+        
         // Convert the key event to a character
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
@@ -129,9 +140,44 @@ class KeyboardMonitor {
         guard !contextBuffer.isEmpty else { return }
 
         print("⏸️  Typing paused. Context buffer (\(contextBuffer.count) chars): \"\(contextBuffer)\"")
-        // Here we could trigger AI completion in the future
+        
+        // Trigger AI completion and show in hover
+        triggerCompletionForHover()
     }
 
+    private func triggerCompletionForHover() {
+        guard let anthropicAPI = anthropicAPI else {
+            print("❌ No AnthropicAPI available")
+            return
+        }
+
+        guard !contextBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("❌ Empty context buffer")
+            return
+        }
+
+        print("🤖 Typing paused - triggering AI completion with context: \"\(contextBuffer)\"")
+
+        Task {
+            do {
+                let completion = try await anthropicAPI.getCompletion(for: contextBuffer)
+                print("✨ AI Completion: \"\(completion)\"")
+
+                // Add leading space for completion
+                let completionWithSpace = " " + completion
+
+                // Show completion in hover window
+                await showCompletionInHover(completionWithSpace)
+                
+                // Store as pending completion
+                pendingCompletion = completionWithSpace
+
+            } catch {
+                print("❌ AI Completion error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     private func triggerCompletion() {
         guard let anthropicAPI = anthropicAPI else {
             print("❌ No AnthropicAPI available")
@@ -161,6 +207,116 @@ class KeyboardMonitor {
                 print("❌ AI Completion error: \(error.localizedDescription)")
             }
         }
+    }
+    
+    private func showCompletionInHover(_ completion: String) async {
+        await MainActor.run {
+            guard let hoverWindow = hoverWindow else { return }
+            
+            // Try to get text cursor position, fallback to mouse position
+            var location: NSPoint
+            
+            if let cursorLocation = getTextCursorLocation() {
+                location = cursorLocation
+            } else {
+                // Fallback to mouse position
+                let mouseLocation = NSEvent.mouseLocation
+                let screenHeight = NSScreen.main?.frame.height ?? 1080
+                location = NSPoint(x: mouseLocation.x, y: screenHeight - mouseLocation.y)
+            }
+            
+            hoverWindow.showCompletion(completion, at: location)
+        }
+    }
+    
+    private func getTextCursorLocation() -> NSPoint? {
+        // Try to get the text insertion point using Accessibility API
+        guard let focusedApp = NSWorkspace.shared.frontmostApplication,
+              let pid = focusedApp.processIdentifier as pid_t? else {
+            return nil
+        }
+        
+        // Get the focused UI element (usually a text field)
+        var focusedElement: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(
+            AXUIElementCreateApplication(pid),
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedElement
+        )
+        
+        guard result == .success, let elementRef = focusedElement else {
+            return nil
+        }
+        
+        // Cast CFTypeRef to AXUIElement (AXUIElement is a typealias for CFTypeRef)
+        let element = unsafeBitCast(elementRef, to: AXUIElement.self)
+        
+        // Try to get the insertion point position
+        var pointValue: CFTypeRef?
+        _ = AXUIElementCopyAttributeValue(
+            element,
+            kAXInsertionPointLineNumberAttribute as CFString,
+            &pointValue
+        )
+        
+        // Get the bounds of the focused element as fallback
+        var boundsValue: CFTypeRef?
+        _ = AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &boundsValue
+        )
+        
+        // Get window position
+        var windowValue: CFTypeRef?
+        _ = AXUIElementCopyAttributeValue(element, kAXWindowAttribute as CFString, &windowValue)
+        
+        if let windowRef = windowValue {
+            // Cast CFTypeRef to AXUIElement
+            let window = unsafeBitCast(windowRef, to: AXUIElement.self)
+            var positionValue: CFTypeRef?
+            if AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
+               let positionRef = positionValue {
+                // Cast CFTypeRef to AXValue (AXValue is a typealias for CFTypeRef)
+                let position = unsafeBitCast(positionRef, to: AXValue.self)
+                var point = CGPoint.zero
+                if AXValueGetValue(position, .cgPoint, &point) {
+                    // Use window position + offset for text field
+                    return NSPoint(x: point.x + 50, y: point.y - 20)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func dismissHover() {
+        hoverWindow?.hide()
+        pendingCompletion = nil
+    }
+    
+    private func acceptPendingCompletion() -> Bool {
+        guard let completion = pendingCompletion, let hoverWindow = hoverWindow, hoverWindow.isVisible() else {
+            return false
+        }
+        
+        print("✅ Accepting completion: \"\(completion)\"")
+        
+        Task {
+            // Dismiss hover first
+            await MainActor.run {
+                dismissHover()
+            }
+            
+            // Insert completion (already includes leading space)
+            await insertText(completion)
+            
+            // Update buffer
+            contextBuffer += completion
+            print("📝 Updated buffer: \"\(contextBuffer)\"")
+        }
+        
+        return true
     }
     
     private func insertText(_ text: String) async {
@@ -220,3 +376,5 @@ class KeyboardMonitor {
         stop()
     }
 }
+
+
