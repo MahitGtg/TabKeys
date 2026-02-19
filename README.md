@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  macOS menu bar app for <strong>system-wide AI completions</strong>. Type anywhere, pause or press Tab to get suggestions, accept with Tab.
+  macOS menu bar app for <strong>system-wide AI completions</strong>. Type anywhere, pause to get suggestions, Tab to accept.
 </p>
 
 ---
@@ -19,7 +19,7 @@ TabKeys suggests completions **system-wide**: type in any app, pause briefly or 
 <p align="center">
   <img src="assets/demo.gif" alt="TabKeys Demo" width="700">
 </p>
-<p align="center"><em>Pause or press Tab to get a suggestion, Tab again to accept.</em></p>
+<p align="center"><em>Pause to get a suggestion, Tab to accept.</em></p>
 
 
 ---
