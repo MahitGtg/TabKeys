@@ -37,7 +37,7 @@
 You can also install the app using [Homebrew](https://brew.sh):
 
 ```bash
-bbrew install --cask MahitGtg/tap/tabkeys
+brew install --cask MahitGtg/tap/tabkeys
 ```
 
 TabKeys.app will be in **Applications**. To update later: `brew upgrade --cask tabkeys`.
