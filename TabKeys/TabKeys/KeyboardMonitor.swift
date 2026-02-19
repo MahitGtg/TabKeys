@@ -11,14 +11,18 @@ class KeyboardMonitor {
     private var lastKeystrokeTime = Date()
     private var pauseTimer: Timer?
     private let pauseThreshold: TimeInterval = 0.5 // 0.5 seconds of pause
-    private weak var anthropicAPI: AnthropicAPI?
+    private weak var completionAPI: CompletionAPI?
     private var hoverWindow: CompletionHoverWindow?
     private var pendingCompletion: String? = nil
     private var appSwitchObserver: NSObjectProtocol?
 
-    init(anthropicAPI: AnthropicAPI?) {
-        self.anthropicAPI = anthropicAPI
+    init(completionAPI: CompletionAPI?) {
+        self.completionAPI = completionAPI
         self.hoverWindow = CompletionHoverWindow()
+    }
+
+    func setCompletionAPI(_ api: CompletionAPI?) {
+        self.completionAPI = api
     }
         
     func start() {
@@ -184,8 +188,8 @@ class KeyboardMonitor {
     }
 
     private func triggerCompletionForHover() {
-        guard let anthropicAPI = anthropicAPI else {
-            print("❌ No AnthropicAPI available")
+        guard let completionAPI = completionAPI else {
+            print("❌ No completion API available (set ANTHROPIC_API_KEY or OPENAI_API_KEY)")
             return
         }
 
@@ -199,7 +203,7 @@ class KeyboardMonitor {
             print("🤖 Typing paused - triggering AI completion with context (\(context.count) chars)")
 
             do {
-                let completion = try await anthropicAPI.getCompletion(for: context)
+                let completion = try await completionAPI.getCompletion(for: context)
                 print("✨ AI Completion: \"\(completion)\"")
 
                 // Add leading space for completion
@@ -218,8 +222,8 @@ class KeyboardMonitor {
     }
     
     private func triggerCompletion() {
-        guard let anthropicAPI = anthropicAPI else {
-            print("❌ No AnthropicAPI available")
+        guard let completionAPI = completionAPI else {
+            print("❌ No completion API available (set ANTHROPIC_API_KEY or OPENAI_API_KEY)")
             return
         }
 
@@ -233,7 +237,7 @@ class KeyboardMonitor {
             print("🤖 Tab pressed - triggering AI completion with context (\(context.count) chars)")
 
             do {
-                let completion = try await anthropicAPI.getCompletion(for: context)
+                let completion = try await completionAPI.getCompletion(for: context)
                 print("✨ AI Completion: \"\(completion)\"")
 
                 // Insert the completion into the active application

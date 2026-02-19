@@ -1,6 +1,11 @@
 import Foundation
 
-class AnthropicAPI {
+/// Protocol for any AI completion provider (Anthropic, OpenAI, etc.).
+protocol CompletionAPI: AnyObject {
+    func getCompletion(for text: String) async throws -> String
+}
+
+class AnthropicAPI: CompletionAPI {
     private let apiKey: String
     private let baseURL = "https://api.anthropic.com/v1/messages"
 
@@ -25,7 +30,7 @@ class AnthropicAPI {
         You are an autocomplete engine. Your only job is to output the next words that continue the user's text. Never add prefixes, explanations, or meta-commentary. Output nothing but the continuation (typically 1-15 words).
         """
         let requestBody: [String: Any] = [
-            "model": "claude-haiku-4-5-20251001",
+            "model": "claude-3-haiku-20240307",
             "max_tokens": 25,
             "temperature": 0.8,
             "system": systemPrompt,

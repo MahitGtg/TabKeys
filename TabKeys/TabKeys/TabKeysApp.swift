@@ -14,7 +14,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var keyboardMonitor: KeyboardMonitor?
     private var permissionTimer: Timer?
-    private var anthropicAPI: AnthropicAPI?
+    private var completionAPI: CompletionAPI?
+    private var settingsWindowController: SettingsWindowController?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create the menubar item
@@ -27,6 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create the menu
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "About TabKeys", action: #selector(showAbout), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Test AI Completion", action: #selector(testAICompletion), keyEquivalent: "t"))
         menu.addItem(NSMenuItem.separator())
@@ -37,16 +39,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         statusItem?.menu = menu
         
-        // Initialize Anthropic API with environment variable
-        if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] {
-            anthropicAPI = AnthropicAPI(apiKey: apiKey)
-            print("✅ Anthropic API initialized")
-        } else {
-            print("⚠️ ANTHROPIC_API_KEY environment variable not set")
-        }
-
-        // Initialize keyboard monitor with API reference
-        keyboardMonitor = KeyboardMonitor(anthropicAPI: anthropicAPI)
+        reloadCompletionAPI()
+        keyboardMonitor = KeyboardMonitor(completionAPI: completionAPI)
 
         // Check and ensure permissions
         ensurePermissions()
@@ -86,6 +80,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// Load API from Keychain first, then environment variables.
+    private func reloadCompletionAPI() {
+        let anthropicKey = KeychainHelper.load(key: "anthropic_api_key")
+            ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]
+        let openaiKey = KeychainHelper.load(key: "openai_api_key")
+            ?? ProcessInfo.processInfo.environment["OPENAI_API_KEY"]
+
+        if let key = anthropicKey, !key.isEmpty {
+            completionAPI = AnthropicAPI(apiKey: key)
+            print("✅ Anthropic API initialized")
+        } else if let key = openaiKey, !key.isEmpty {
+            completionAPI = OpenAIAPI(apiKey: key)
+            print("✅ OpenAI API initialized")
+        } else {
+            completionAPI = nil
+            print("⚠️ Open Settings from the menu to add an API key (Anthropic or OpenAI)")
+        }
+
+        keyboardMonitor?.setCompletionAPI(completionAPI)
+    }
+
+    @objc func showSettings() {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController { [weak self] in
+                self?.reloadCompletionAPI()
+                self?.keyboardMonitor?.stop()
+                if AXIsProcessTrusted() {
+                    self?.keyboardMonitor?.start()
+                }
+            }
+        }
+        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc func showAbout() {
         let alert = NSAlert()
         alert.messageText = "TabKeys"
@@ -127,8 +156,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func testAICompletion() {
-        guard let anthropicAPI = anthropicAPI else {
-            print("❌ Anthropic API not initialized. Set ANTHROPIC_API_KEY environment variable.")
+        guard let completionAPI = completionAPI else {
+            print("❌ No API key set. Use Settings… from the menu to add one.")
             return
         }
 
@@ -146,7 +175,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task {
             do {
-                let completion = try await anthropicAPI.getCompletion(for: testSentence)
+                let completion = try await completionAPI.getCompletion(for: testSentence)
                 print("🤖 Completion: \"\(completion)\"")
                 print("📄 Full result: \"\(testSentence)\(completion)\"")
             } catch {
