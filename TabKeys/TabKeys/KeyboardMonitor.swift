@@ -13,6 +13,7 @@ class KeyboardMonitor {
     private weak var anthropicAPI: AnthropicAPI?
     private var hoverWindow: CompletionHoverWindow?
     private var pendingCompletion: String? = nil
+    private var appSwitchObserver: NSObjectProtocol?
 
     init(anthropicAPI: AnthropicAPI?) {
         self.anthropicAPI = anthropicAPI
@@ -27,7 +28,11 @@ class KeyboardMonitor {
         
         print("🎯 Starting keyboard monitor...")
         
+        // Key down + mouse down (clicks) so we can clear context on click
         let eventMask = (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.leftMouseDown.rawValue)
+            | (1 << CGEventType.rightMouseDown.rawValue)
+            | (1 << CGEventType.otherMouseDown.rawValue)
         
         let selfPointer = Unmanaged.passUnretained(self).toOpaque()
 
@@ -37,8 +42,13 @@ class KeyboardMonitor {
             options: .defaultTap,
             eventsOfInterest: CGEventMask(eventMask),
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
-                if type == .keyDown {
-                    let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon!).takeUnretainedValue()
+                let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon!).takeUnretainedValue()
+
+                switch type {
+                case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+                    // Pointer click: clear context so we stay context-aware
+                    monitor.clearContextOnFocusChange()
+                case .keyDown:
                     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
                     // Tab key (keyCode 48) - only insert completion if hover has one; otherwise let Tab through
@@ -51,6 +61,8 @@ class KeyboardMonitor {
 
                     // For other keys, capture the character and add to buffer
                     monitor.handleKeystroke(event: event)
+                default:
+                    break
                 }
 
                 return Unmanaged.passRetained(event)
@@ -66,6 +78,15 @@ class KeyboardMonitor {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: eventTap, enable: true)
         
+        // Clear context when user switches app
+        appSwitchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearContextOnFocusChange()
+        }
+        
         isRunning = true
         print("✅ Keyboard monitor started!")
     }
@@ -78,6 +99,11 @@ class KeyboardMonitor {
         
         dismissHover()
 
+        if let observer = appSwitchObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            appSwitchObserver = nil
+        }
+
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
             if let runLoopSource = runLoopSource {
@@ -87,6 +113,17 @@ class KeyboardMonitor {
 
         isRunning = false
         print("⏹️  Keyboard monitor stopped")
+    }
+    
+    /// Clears context buffer and dismisses hover when focus changes (click or app switch).
+    /// Keeps completions context-aware: only continuous typing in the same place is used.
+    private func clearContextOnFocusChange() {
+        guard !contextBuffer.isEmpty || pendingCompletion != nil else { return }
+        contextBuffer = ""
+        dismissHover()
+        pauseTimer?.invalidate()
+        pauseTimer = nil
+        print("🧹 Context cleared (click or app switch)")
     }
     
     private func handleKeystroke(event: CGEvent) {

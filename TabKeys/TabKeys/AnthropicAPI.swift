@@ -9,22 +9,26 @@ class AnthropicAPI {
     }
 
     func getCompletion(for text: String) async throws -> String {
-        let prompt = """
-        You are a text completion assistant. Complete this text fragment by providing ONLY the next words that should follow. Do not repeat any part of the original text.
+        // Minimal prompt: chat models tend to explain; we want only the next tokens.
+        let userPrompt = """
+        Continue this text. Output ONLY the next few words that would naturally follow. No explanation, no quotes, no "here is" or "the completion is". Just the continuation.
 
-        Text to complete: "\(text)"
-
-        Provide only the continuation (1-20 words):
+        \(text)
         """
 
-        let rawResponse = try await makeAPICall(with: prompt)
+        let rawResponse = try await makeAPICall(with: userPrompt)
         return cleanResponse(rawResponse, originalText: text)
     }
 
     private func makeAPICall(with prompt: String) async throws -> String {
+        let systemPrompt = """
+        You are an autocomplete engine. Your only job is to output the next words that continue the user's text. Never add prefixes, explanations, or meta-commentary. Output nothing but the continuation (typically 1-15 words).
+        """
         let requestBody: [String: Any] = [
-            "model": "claude-3-haiku-20240307",
-            "max_tokens": 50,
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 25,
+            "temperature": 0.8,
+            "system": systemPrompt,
             "messages": [
                 [
                     "role": "user",
@@ -117,6 +121,9 @@ enum APIError: Error, LocalizedError {
         }
     }
 }
+
+
+
 
 
 
