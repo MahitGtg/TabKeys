@@ -116,9 +116,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showAbout() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let alert = NSAlert()
         alert.messageText = "TabKeys"
-        alert.informativeText = "Version 1.0\nSystem-wide AI completions"
+        alert.informativeText = "Version \(version)\nSystem-wide AI completions"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()
