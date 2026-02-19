@@ -37,7 +37,7 @@
 You can also install the app using [Homebrew](https://brew.sh):
 
 ```bash
-brew install --cask mahitgupta/tap/tabkeys --no-quarantine
+bbrew install --cask MahitGtg/tap/tabkeys
 ```
 
 TabKeys.app will be in **Applications**. To update later: `brew upgrade --cask tabkeys`.
@@ -79,12 +79,14 @@ API keys can be created at [Anthropic](https://console.anthropic.com/) or [OpenA
 ### Installation
 
 1. **Clone the Repository**:
+
    ```bash
    git clone https://github.com/mahitgupta/TabKeys.git
    cd TabKeys
    ```
 
 2. **Open the Project in Xcode**:
+
    ```bash
    open TabKeys/TabKeys.xcodeproj
    ```
@@ -98,6 +100,18 @@ API keys can be created at [Anthropic](https://console.anthropic.com/) or [OpenA
    - Click the **Run** button or press **Cmd + R**. Grant **Accessibility** when macOS prompts.
 
 5. **Signing (if needed)**: If Xcode complains about signing, select the **TabKeys** target → **Signing & Capabilities** → choose your **Team** (or “Sign to Run Locally” for development).
+
+## Known Limitations
+
+- Context reading via Accessibility API works best in native macOS apps (TextEdit, Notes, Mail)
+- Some apps (VS Code, Chrome, Slack) may have limited context awareness
+- Arrow key navigation currently clears context (coming soon: smarter navigation handling)
+
+## Roadmap
+
+- [ ] Faster model options (local/Groq)
+- [ ] Smarter context preservation during navigation
+- [ ] Completion quality metrics
 
 ---
 
