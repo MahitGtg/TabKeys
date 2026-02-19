@@ -16,9 +16,18 @@
 
 TabKeys suggests completions **system-wide**: type in any app, pause briefly or press **Tab** to trigger a suggestion, then accept with **Tab**.
 
-![TabKeys Demo](assets/demo.mov)
-
-*Pause or press Tab to get a suggestion, Tab again to accept.*
+<table>
+  <tr>
+    <td align="center">
+      <img src="assets/demo.mp4" alt="TabKeys Demo" width="720" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <sub><strong>Demo:</strong> Pause or press Tab to get a suggestion, Tab again to accept.</sub>
+    </td>
+  </tr>
+</table>
 
 
 ---
