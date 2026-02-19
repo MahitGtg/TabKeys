@@ -10,12 +10,6 @@
   macOS menu bar app for <strong>system-wide AI completions</strong>. Type anywhere, pause to get suggestions, Tab to accept.
 </p>
 
-<p align="center">
-  <a href="https://github.com/MahitGtg/TabKeys/releases/latest/download/TabKeys.dmg">
-    <img src="assets/download-macos.png" alt="Download app for macOS" width="280">
-  </a>
-</p>
-
 ---
 
 ## Demo
@@ -49,7 +43,15 @@ TabKeys suggests completions **system-wide**: type in any app, pause briefly or 
 >
 > You only need to do this once.
 
-### Option 1: Install via Homebrew
+### Option 1: Download and Install the DMG
+
+<p align="center">
+  <a href="https://github.com/MahitGtg/TabKeys/releases/latest/download/TabKeys.dmg">
+    <img src="assets/download-macos.png" alt="Download app for macOS" width="280">
+  </a>
+</p>
+
+### Option 2: Install via Homebrew
 
 You can also install the app using [Homebrew](https://brew.sh):
 
@@ -59,7 +61,7 @@ brew install --cask MahitGtg/tap/tabkeys
 
 TabKeys.app will be in **Applications**. To update later: `brew upgrade --cask tabkeys`.
 
-### Option 2: Download and Install Manually
+### Option 3: Download and Install Manually
 
 1. **Click the app icon above** to download the DMG, or go to the [Releases](https://github.com/MahitGtg/TabKeys/releases) page for **TabKeys.dmg** or **TabKeys.zip**.
 2. Open the DMG (or unzip the zip), then drag **TabKeys.app** to Applications (or leave it anywhere).
