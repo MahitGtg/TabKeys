@@ -16,10 +16,10 @@
 
 TabKeys suggests completions **system-wide**: type in any app, pause briefly or press **Tab** to trigger a suggestion, then accept with **Tab**.
 
-|  |
-| :---: |
-| ![TabKeys Demo](assets/demo.mp4) |
-| *Pause or press Tab to get a suggestion, Tab again to accept.* |
+<p align="center">
+  <video src="https://raw.githubusercontent.com/MahitGtg/TabKeys/main/assets/demo.mp4" controls width="700"></video>
+</p>
+<p align="center"><em>Pause or press Tab to get a suggestion, Tab again to accept.</em></p>
 
 
 ---
