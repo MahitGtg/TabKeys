@@ -17,7 +17,7 @@
 TabKeys suggests completions **system-wide**: type in any app, pause briefly or press **Tab** to trigger a suggestion, then accept with **Tab**.
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/MahitGtg/TabKeys/main/assets/demo.mp4" controls width="700"></video>
+  <img src="assets/demo.gif" alt="TabKeys Demo" width="700">
 </p>
 <p align="center"><em>Pause or press Tab to get a suggestion, Tab again to accept.</em></p>
 
