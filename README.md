@@ -44,7 +44,7 @@ TabKeys.app will be in **Applications**. To update later: `brew upgrade --cask t
 
 ### Option 2: Download and Install Manually
 
-1. Go to the [Releases](https://github.com/mahitgupta/TabKeys/releases) page and download **TabKeys.zip**.
+1. Go to the [Releases](https://github.com/MahitGtg/TabKeys/releases) page and download **TabKeys.zip**.
 2. Unzip and move **TabKeys.app** to Applications (or leave it anywhere).
 3. Open **TabKeys.app**. Grant **Accessibility** when macOS asks. If macOS blocks the app, use **Open Anyway** as in the steps above.
 
@@ -81,7 +81,7 @@ API keys can be created at [Anthropic](https://console.anthropic.com/) or [OpenA
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/mahitgupta/TabKeys.git
+   git clone https://github.com/MahitGtg/TabKeys.git
    cd TabKeys
    ```
 
