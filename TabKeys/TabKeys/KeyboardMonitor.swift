@@ -2,6 +2,7 @@ import Cocoa
 import ApplicationServices
 import Carbon
 
+
 class KeyboardMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -188,16 +189,17 @@ class KeyboardMonitor {
             return
         }
 
-        guard !contextBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("❌ Empty context buffer")
-            return
-        }
-
-        print("🤖 Typing paused - triggering AI completion with context: \"\(contextBuffer)\"")
-
         Task {
+            let context = await MainActor.run { getCompletionContext() }
+            guard let context = context else {
+                print("❌ No context (empty buffer and no Accessibility text)")
+                return
+            }
+
+            print("🤖 Typing paused - triggering AI completion with context (\(context.count) chars)")
+
             do {
-                let completion = try await anthropicAPI.getCompletion(for: contextBuffer)
+                let completion = try await anthropicAPI.getCompletion(for: context)
                 print("✨ AI Completion: \"\(completion)\"")
 
                 // Add leading space for completion
@@ -221,16 +223,17 @@ class KeyboardMonitor {
             return
         }
 
-        guard !contextBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("❌ Empty context buffer")
-            return
-        }
-
-        print("🤖 Tab pressed - triggering AI completion with context: \"\(contextBuffer)\"")
-
         Task {
+            let context = await MainActor.run { getCompletionContext() }
+            guard let context = context else {
+                print("❌ No context (empty buffer and no Accessibility text)")
+                return
+            }
+
+            print("🤖 Tab pressed - triggering AI completion with context (\(context.count) chars)")
+
             do {
-                let completion = try await anthropicAPI.getCompletion(for: contextBuffer)
+                let completion = try await anthropicAPI.getCompletion(for: context)
                 print("✨ AI Completion: \"\(completion)\"")
 
                 // Insert the completion into the active application
@@ -264,6 +267,150 @@ class KeyboardMonitor {
             
             hoverWindow.showCompletion(completion, at: location)
         }
+    }
+    
+    /// Phase 2: Full text from the current app via Accessibility API.
+    /// Uses system-wide focused element first (per Apple docs / public repos), then app-based; searches descendants for AXValue.
+    private func getFocusedElementText() -> String? {
+        // 1) System-wide focused element
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        let sysResult = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef)
+        if sysResult == .success, let ref = focusedRef {
+            let element = unsafeBitCast(ref, to: AXUIElement.self)
+            if let text = getTextBeforeCursor(from: element, maxDepth: 6), !text.isEmpty {
+                return text
+            }
+        }
+        
+        // 2) Fallback: focused element from frontmost application
+        guard let focusedApp = NSWorkspace.shared.frontmostApplication,
+              let pid = focusedApp.processIdentifier as pid_t? else {
+            return nil
+        }
+        var appFocusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            AXUIElementCreateApplication(pid),
+            kAXFocusedUIElementAttribute as CFString,
+            &appFocusedRef
+        ) == .success, let appRef = appFocusedRef else { return nil }
+        let appElement = unsafeBitCast(appRef, to: AXUIElement.self)
+        if let text = getTextBeforeCursor(from: appElement, maxDepth: 6), !text.isEmpty {
+            return text
+        }
+        return nil
+    }
+    
+    /// Returns text from this element (or a descendant) up to the insertion point only.
+    private func getTextBeforeCursor(from element: AXUIElement, maxDepth: Int) -> String? {
+        guard maxDepth > 0 else { return nil }
+        if let fullText = getAXValueString(from: element), !fullText.isEmpty {
+            guard let cursorIndex = getInsertionPointIndex(from: element) else {
+                return fullText // No range support – use full text as fallback
+            }
+            if cursorIndex == 0 {
+                return nil // Cursor at start – no context before
+            }
+            if cursorIndex >= fullText.count {
+                return fullText
+            }
+            return String(fullText.prefix(cursorIndex))
+        }
+        var childrenRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+              let children = childrenRef,
+              let arr = children as? NSArray else {
+            return nil
+        }
+        for i in 0..<arr.count {
+            let childRef = arr.object(at: i)
+            let child = unsafeBitCast(childRef, to: AXUIElement.self)
+            if let text = getTextBeforeCursor(from: child, maxDepth: maxDepth - 1), !text.isEmpty {
+                return text
+            }
+        }
+        return nil
+    }
+    
+    /// Insertion point character index (AXSelectedTextRange.location).
+    private func getInsertionPointIndex(from element: AXUIElement) -> Int? {
+        var rangeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
+              let ref = rangeRef,
+              CFGetTypeID(ref) == AXValueGetTypeID() else {
+            return nil
+        }
+        let axValue = unsafeBitCast(ref, to: AXValue.self)
+        var cfRange = CFRange(location: 0, length: 0)
+        guard AXValueGetValue(axValue, .cfRange, &cfRange) else {
+            return nil
+        }
+        return cfRange.location
+    }
+    
+    /// Recursively search element and its descendants for kAXValueAttribute (and kAXTitleAttribute fallback); maxDepth avoids infinite recursion.
+    private func findAXValueInElement(_ element: AXUIElement, maxDepth: Int) -> String? {
+        if maxDepth <= 0 { return nil }
+        if let text = getAXValueString(from: element), !text.isEmpty { return text }
+        if let text = getAXTitleString(from: element), !text.isEmpty { return text }
+        var childrenRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+              let children = childrenRef,
+              let arr = children as? NSArray else {
+            return nil
+        }
+        for i in 0..<arr.count {
+            let childRef = arr.object(at: i)
+            let child = unsafeBitCast(childRef, to: AXUIElement.self)
+            if let text = findAXValueInElement(child, maxDepth: maxDepth - 1), !text.isEmpty {
+                return text
+            }
+        }
+        return nil
+    }
+    
+    private func getAXValueString(from element: AXUIElement) -> String? {
+        var valueRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
+              let value = valueRef else {
+            return nil
+        }
+        if CFGetTypeID(value) == CFStringGetTypeID() {
+            let str = (value as! CFString) as String
+            return str.isEmpty ? nil : str
+        }
+        if let str = value as? String, !str.isEmpty {
+            return str
+        }
+        return nil
+    }
+    
+    private func getAXTitleString(from element: AXUIElement) -> String? {
+        var titleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleRef) == .success,
+              let title = titleRef,
+              CFGetTypeID(title) == CFStringGetTypeID() else { return nil }
+        let str = (title as! CFString) as String
+        return str.isEmpty ? nil : str
+    }
+    
+    /// Context for completion: prefer full text from current app (Accessibility), else typed buffer.
+    /// Trims to last maxChars to stay within API limits.
+    private func getCompletionContext(maxChars: Int = 4000) -> String? {
+        let fromAccessibility = getFocusedElementText()
+        let fromBuffer = contextBuffer
+        
+        let raw: String
+        if let ax = fromAccessibility, !ax.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            raw = ax
+        } else {
+            raw = fromBuffer
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        
+        if raw.count <= maxChars { return raw }
+        return String(raw.suffix(maxChars))
     }
     
     private func getTextCursorLocation() -> NSPoint? {
