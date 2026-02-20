@@ -125,6 +125,8 @@ API keys can be created at [Anthropic](https://console.anthropic.com/) or [OpenA
 - Context reading via Accessibility API works best in native macOS apps (TextEdit, Notes, Mail)
 - Some apps (VS Code, Chrome, Slack) may have limited context awareness
 - Arrow key navigation currently clears context (coming soon: smarter navigation handling)
+- Enable/Disable app based completions
+- Model selection
 
 ## Roadmap
 
